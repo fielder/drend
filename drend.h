@@ -6,14 +6,6 @@
 
 typedef uint16_t pixel_t;
 
-#define WIDTH (320 * 1)
-#define HEIGHT (240 * 1)
-#define BPP (sizeof(pixel_t) * 8)
-
-#define FOV_X 90.0 /* degrees */
-
-#define FLYSPEED 64.0
-
 enum
 {
 	VPLANE_LEFT,
@@ -78,10 +70,15 @@ struct input_s
 	} key;
 };
 
-extern pixel_t **rowtab;
+struct video_s
+{
+	int w, h;
+	pixel_t **rows;
+};
 
 extern struct camera_s camera;
 extern struct input_s input;
+extern struct video_s vid;
 
 extern void
 Quit (void);

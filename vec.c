@@ -67,6 +67,7 @@ Vec_Normalize (float v[2])
 	}
 	else
 	{
+		/* multiplying by the reciprocal is faster but less accurate */
 		v[0] /= len;
 		v[1] /= len;
 	}

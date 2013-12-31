@@ -26,10 +26,9 @@ const int bind_right = SDLK_RIGHT;
 
 struct camera_s camera;
 struct input_s input;
+struct video_s vid;
 
 static SDL_Surface *sdl_surf = NULL;
-
-pixel_t **rowtab = NULL;
 
 float frametime;
 
@@ -39,6 +38,9 @@ static struct
 	int framecount;
 	Uint32 calc_start;
 } fps;
+
+const float flyspeed = 64.0;
+const float cam_fov_x = 90.0;
 
 
 static void
@@ -54,10 +56,10 @@ Shutdown (void)
 		sdl_surf = NULL;
 	}
 
-	if (rowtab != NULL)
+	if (vid.rows != NULL)
 	{
-		free (rowtab);
-		rowtab = NULL;
+		free (vid.rows);
+		vid.rows = NULL;
 	}
 
 	SDL_Quit ();
@@ -87,27 +89,26 @@ Init (void)
 	}
 
 	flags = SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWPALETTE;
-	if ((sdl_surf = SDL_SetVideoMode(WIDTH, HEIGHT, BPP, flags)) == NULL)
+	if ((sdl_surf = SDL_SetVideoMode(vid.w, vid.h, sizeof(pixel_t) * 8, flags)) == NULL)
 	{
 		fprintf (stderr, "ERROR: failed setting video mode\n");
 		Quit ();
 	}
 
-	rowtab = malloc (HEIGHT * sizeof(*rowtab));
-
-	for (y = 0; y < HEIGHT; y++)
-		rowtab[y] = (pixel_t *)((uintptr_t)sdl_surf->pixels + y * sdl_surf->pitch);
+	vid.rows = malloc (vid.h * sizeof(*vid.rows));
+	for (y = 0; y < vid.h; y++)
+		vid.rows[y] = (pixel_t *)((uintptr_t)sdl_surf->pixels + y * sdl_surf->pitch);
 
 	printf ("Set %dx%dx%d video mode\n", sdl_surf->w, sdl_surf->h, sdl_surf->format->BytesPerPixel * 8);
 
 	/* camera setup */
 
-	camera.center_x = WIDTH / 2.0;
-	camera.center_y = HEIGHT / 2.0;
+	camera.center_x = vid.w / 2.0;
+	camera.center_y = vid.h / 2.0;
 
-	camera.fov_x = FOV_X * (M_PI / 180.0);
-	camera.dist = (WIDTH / 2.0) / tan(camera.fov_x / 2.0);
-	camera.fov_y = 2.0 * atan((HEIGHT / 2.0) / camera.dist);
+	camera.fov_x = cam_fov_x * (M_PI / 180.0);
+	camera.dist = (vid.w / 2.0) / tan(camera.fov_x / 2.0);
+	camera.fov_y = 2.0 * atan((vid.h / 2.0) / camera.dist);
 
 	Vec_Clear (camera.pos);
 	camera.altitude = 0.0;
@@ -196,6 +197,7 @@ FetchInput (void)
 					 * input */
 					if (_mouse_ignore_move == 0)
 					{
+						//FIXME: a grabbed mouse under vmware gives jacked deltas
 						input.mouse.delta[0] = sdlev.motion.xrel;
 						input.mouse.delta[1] = sdlev.motion.yrel;
 					}
@@ -276,7 +278,7 @@ CameraMovement (void)
 
 	/* angle */
 
-	camera.angle += -input.mouse.delta[0] * (camera.fov_x / WIDTH);
+	camera.angle += -input.mouse.delta[0] * (camera.fov_x / vid.w);
 	while (camera.angle >= 2.0 * M_PI)
 		camera.angle -= 2.0 * M_PI;
 	while (camera.angle < 0.0)
@@ -294,20 +296,20 @@ CameraMovement (void)
 	left += input.key.state[bind_left] ? 1 : 0;
 	left -= input.key.state[bind_right] ? 1 : 0;
 	Vec_Copy (camera.left, v);
-	Vec_Scale (v, left * FLYSPEED * frametime);
+	Vec_Scale (v, left * flyspeed * frametime);
 	Vec_Add (camera.pos, v, camera.pos);
 
 	forward = 0;
 	forward += input.key.state[bind_forward] ? 1 : 0;
 	forward -= input.key.state[bind_back] ? 1 : 0;
 	Vec_Copy (camera.forward, v);
-	Vec_Scale (v, forward * FLYSPEED * frametime);
+	Vec_Scale (v, forward * flyspeed * frametime);
 	Vec_Add (camera.pos, v, camera.pos);
 
 	up = 0;
 	up += input.mouse.button.state[MBUTTON_RIGHT] ? 1 : 0;
 	up -= input.mouse.button.state[MBUTTON_MIDDLE] ? 1 : 0;
-	camera.altitude += up * FLYSPEED * frametime;
+	camera.altitude += up * flyspeed * frametime;
 }
 
 
@@ -349,8 +351,8 @@ Refresh (void)
 	if (1)
 	{
 		int y;
-		for (y = 0; y < HEIGHT; y++)
-			memset (rowtab[y], 0x00, WIDTH * sizeof(*rowtab[y]));
+		for (y = 0; y < vid.h; y++)
+			memset (vid.rows[y], 0x00, vid.w * sizeof(*vid.rows[y]));
 	}
 
 	/* finally, draw pixels out */
@@ -380,6 +382,10 @@ int
 main (int argc, const char **argv)
 {
 	Uint32 last, duration, now;
+
+	memset (&vid, 0, sizeof(vid));
+	vid.w = 320 * 1;
+	vid.h = 240 * 1;
 
 	Init ();
 
