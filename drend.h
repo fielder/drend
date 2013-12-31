@@ -39,10 +39,10 @@ struct camera_s
 	float altitude;
 	float angle; /* radians */
 
-	float xform[2][2]; /* world-to-camera */
-
 	float left[2];
 	float forward[2];
+
+	float xform[2][2]; /* world-to-camera */
 
 	struct viewplane_s vplanes[2];
 };

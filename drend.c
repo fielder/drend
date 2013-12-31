@@ -246,6 +246,28 @@ ToggleGrab (void)
 
 
 static void
+LockSurface (void)
+{
+	if (SDL_MUSTLOCK(sdl_surf))
+	{
+		if (SDL_LockSurface(sdl_surf) != 0)
+		{
+			fprintf (stderr, "ERROR: surface lock failed\n");
+			Quit ();
+		}
+	}
+}
+
+
+static void
+UnLockSurface (void)
+{
+	if (SDL_MUSTLOCK(sdl_surf))
+		SDL_UnlockSurface (sdl_surf);
+}
+
+
+static void
 CameraMovement (void)
 {
 	float mat[2][2];
@@ -322,27 +344,19 @@ Refresh (void)
 	/* do as much as we can _before_ touching the frame buffer */
 	R_DrawScene ();
 
-	if (SDL_MUSTLOCK(sdl_surf))
-	{
-		if (SDL_LockSurface(sdl_surf) != 0)
-		{
-			fprintf (stderr, "ERROR: surface lock failed\n");
-			Quit ();
-		}
-	}
+	LockSurface ();
 
 	if (1)
 	{
 		int y;
 		for (y = 0; y < HEIGHT; y++)
-			memset (rowtab[y], 0x0, WIDTH * sizeof(*rowtab[y]));
+			memset (rowtab[y], 0x00, WIDTH * sizeof(*rowtab[y]));
 	}
 
 	/* finally, draw pixels out */
 	R_RenderScene ();
 
-	if (SDL_MUSTLOCK(sdl_surf))
-		SDL_UnlockSurface (sdl_surf);
+	UnLockSurface ();
 
 	SDL_Flip (sdl_surf);
 

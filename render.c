@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "vec.h"
 #include "drend.h"
 #include "render.h"
@@ -6,63 +8,20 @@
 static void
 CalcCamera (void)
 {
-//	Vec_RotationMatrix (-camera.angle, camera.xform);
+	double s, c;
 
-	//TODO: xform
-	//TODO: vplanes
-#if 0
-	float cam2world[3][3];
-	float v[3];
-	struct viewplane_s *p;
-	float ang;
+	Vec_RotationMatrix (camera.angle, camera.xform);
 
-	/* make transformation matrix */
-	Vec_Copy (cam.angles, v);
-	Vec_Scale (v, -1.0);
-	Vec_AnglesMatrix (v, cam.xform, "xyz");
+	s = sin (camera.fov_x / 2.0);
+	c = cos (camera.fov_x / 2.0);
 
-	/* get view vectors */
-	Vec_Copy (cam.xform[0], cam.left);
-	Vec_Copy (cam.xform[1], cam.up);
-	Vec_Copy (cam.xform[2], cam.forward);
+	camera.vplanes[VPLANE_LEFT].normal[0] = -c;
+	camera.vplanes[VPLANE_LEFT].normal[1] = s;
+	camera.vplanes[VPLANE_LEFT].dist = Vec_Dot (camera.vplanes[VPLANE_LEFT].normal, camera.pos);
 
-	/* set up view planes */
-
-	/* view to world transformation matrix */
-	Vec_AnglesMatrix (cam.angles, cam2world, "zyx");
-
-	p = &cam.vplanes[VPLANE_LEFT];
-	ang = (cam.fov_x / 2.0);
-	v[0] = -cos (ang);
-	v[1] = 0.0;
-	v[2] = sin (ang);
-	Vec_Transform (cam2world, v, p->normal);
-	p->dist = Vec_Dot (p->normal, cam.pos);
-
-	p = &cam.vplanes[VPLANE_RIGHT];
-	ang = (cam.fov_x / 2.0);
-	v[0] = cos (ang);
-	v[1] = 0.0;
-	v[2] = sin (ang);
-	Vec_Transform (cam2world, v, p->normal);
-	p->dist = Vec_Dot (p->normal, cam.pos);
-
-	p = &cam.vplanes[VPLANE_TOP];
-	ang = (cam.fov_y / 2.0);
-	v[0] = 0.0;
-	v[1] = -cos (ang);
-	v[2] = sin (ang);
-	Vec_Transform (cam2world, v, p->normal);
-	p->dist = Vec_Dot (p->normal, cam.pos);
-
-	p = &cam.vplanes[VPLANE_BOTTOM];
-	ang = (cam.fov_y / 2.0);
-	v[0] = 0.0;
-	v[1] = cos (ang);
-	v[2] = sin (ang);
-	Vec_Transform (cam2world, v, p->normal);
-	p->dist = Vec_Dot (p->normal, cam.pos);
-#endif
+	camera.vplanes[VPLANE_RIGHT].normal[0] = c;
+	camera.vplanes[VPLANE_RIGHT].normal[1] = s;
+	camera.vplanes[VPLANE_RIGHT].dist = Vec_Dot (camera.vplanes[VPLANE_RIGHT].normal, camera.pos);
 }
 
 
