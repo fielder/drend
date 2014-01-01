@@ -40,12 +40,13 @@ static struct
 } fps;
 
 const float flyspeed = 64.0;
-const float cam_fov_x = 90.0;
 
 
 static void
 Shutdown (void)
 {
+	R_Shutdown ();
+
 	if (sdl_surf != NULL)
 	{
 		SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
@@ -81,18 +82,19 @@ Quit (void)
 
 
 static void
-Init (void)
+InitVideo (void)
 {
 	Uint32 flags;
 	int y;
 
-	/* video mode setup */
-
-	if (SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
+	if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
 	{
-		fprintf (stderr, "ERROR: SDL init failed\n");
-		exit (EXIT_FAILURE);
+		fprintf (stderr, "ERROR: video init failed\n");
+		Quit ();
 	}
+
+	printf ("Setting mode %dx%dx%d\n", vid.w, vid.h, (int)sizeof(pixel_t) * 8);
+	printf ("Scaling %dx\n", vid.scale);
 
 	flags = SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWPALETTE;
 	if ((sdl_surf = SDL_SetVideoMode(vid.w * vid.scale, vid.h * vid.scale, sizeof(pixel_t) * 8, flags)) == NULL)
@@ -115,19 +117,6 @@ Init (void)
 		for (y = 0; y < vid.h; y++)
 			vid.rows[y] = vid.bouncebuf + y * vid.w;
 	}
-
-	/* camera setup */
-
-	camera.center_x = vid.w / 2.0;
-	camera.center_y = vid.h / 2.0;
-
-	camera.fov_x = cam_fov_x * (M_PI / 180.0);
-	camera.dist = (vid.w / 2.0) / tan(camera.fov_x / 2.0);
-	camera.fov_y = 2.0 * atan((vid.h / 2.0) / camera.dist);
-
-	Vec_Clear (camera.pos);
-	camera.altitude = 0.0;
-	camera.angle = 0.0;
 }
 
 
@@ -290,6 +279,7 @@ CameraMovement (void)
 	float mat[2][2];
 	float v[2];
 	int left, forward, up;
+	float speed = flyspeed;
 
 	/* angle */
 
@@ -307,24 +297,27 @@ CameraMovement (void)
 
 	/* movement */
 
+	if (input.key.state[SDLK_LSHIFT] || input.key.state[SDLK_RSHIFT])
+		speed *= 1.5;
+
 	left = 0;
 	left += input.key.state[bind_left] ? 1 : 0;
 	left -= input.key.state[bind_right] ? 1 : 0;
 	Vec_Copy (camera.left, v);
-	Vec_Scale (v, left * flyspeed * frametime);
+	Vec_Scale (v, left * speed * frametime);
 	Vec_Add (camera.pos, v, camera.pos);
 
 	forward = 0;
 	forward += input.key.state[bind_forward] ? 1 : 0;
 	forward -= input.key.state[bind_back] ? 1 : 0;
 	Vec_Copy (camera.forward, v);
-	Vec_Scale (v, forward * flyspeed * frametime);
+	Vec_Scale (v, forward * speed * frametime);
 	Vec_Add (camera.pos, v, camera.pos);
 
 	up = 0;
 	up += input.mouse.button.state[MBUTTON_RIGHT] ? 1 : 0;
 	up -= input.mouse.button.state[MBUTTON_MIDDLE] ? 1 : 0;
-	camera.altitude += up * flyspeed * frametime;
+	camera.altitude += up * speed * frametime;
 }
 
 
@@ -453,6 +446,15 @@ CopyScreenScaled (void)
 
 
 static void
+ClearScreen (int color)
+{
+	int y;
+	for (y = 0; y < vid.h; y++)
+		memset (vid.rows[y], color, vid.w * sizeof(*vid.rows[y]));
+}
+
+
+static void
 Refresh (void)
 {
 	/* do as much as we can _before_ touching the frame buffer */
@@ -504,12 +506,19 @@ main (int argc, const char **argv)
 {
 	Uint32 last, duration, now;
 
+	if (SDL_InitSubSystem(SDL_INIT_TIMER) != 0)
+	{
+		fprintf (stderr, "ERROR: SDL init failed\n");
+		exit (EXIT_FAILURE);
+	}
+
 	memset (&vid, 0, sizeof(vid));
 	vid.w = 320;
 	vid.h = 240;
 	vid.scale = 3;
 
-	Init ();
+	InitVideo ();
+	R_Init ();
 
 	last = SDL_GetTicks ();
 	for (;;)

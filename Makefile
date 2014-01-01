@@ -9,7 +9,8 @@ TARGET = $(OBJDIR)/drend
 
 OBJS =	$(OBJDIR)/drend.o \
 	$(OBJDIR)/vec.o \
-	$(OBJDIR)/render.o
+	$(OBJDIR)/r_main.o \
+	$(OBJDIR)/r_wall.o
 
 all: $(TARGET)
 
@@ -26,9 +27,7 @@ $(OBJDIR)/drend.o: drend.c
 	$(CC) -c $(CFLAGS) $? -o $@
 $(OBJDIR)/vec.o: vec.c
 	$(CC) -c $(CFLAGS) $? -o $@
-$(OBJDIR)/render.o: render.c
+$(OBJDIR)/r_main.o: r_main.c
 	$(CC) -c $(CFLAGS) $? -o $@
-$(OBJDIR)/clip.o: clip.c
-	$(CC) -c $(CFLAGS) $? -o $@
-$(OBJDIR)/edge.o: edge.c
+$(OBJDIR)/r_wall.o: r_wall.c
 	$(CC) -c $(CFLAGS) $? -o $@

@@ -2,7 +2,10 @@
 #define __RENDER_H__
 
 extern void
-ClearScreen (int color);
+R_Init (void);
+
+extern void
+R_Shutdown (void);
 
 extern void
 R_DrawScene (void);

@@ -5,13 +5,28 @@
 #include "drend.h"
 #include "render.h"
 
+const float fov_x = 90.0;
+
 
 void
-ClearScreen (int color)
+R_Init (void)
 {
-	int y;
-	for (y = 0; y < vid.h; y++)
-		memset (vid.rows[y], color, vid.w * sizeof(*vid.rows[y]));
+	camera.center_x = vid.w / 2.0;
+	camera.center_y = vid.h / 2.0;
+
+	camera.fov_x = fov_x * (M_PI / 180.0);
+	camera.dist = (vid.w / 2.0) / tan(camera.fov_x / 2.0);
+	camera.fov_y = 2.0 * atan((vid.h / 2.0) / camera.dist);
+
+	Vec_Clear (camera.pos);
+	camera.altitude = 0.0;
+	camera.angle = 0.0;
+}
+
+
+void
+R_Shutdown (void)
+{
 }
 
 
@@ -42,6 +57,10 @@ CalcCamera (void)
 }
 
 
+/*
+ * Traverse the world and set up structures to prepare drawing to the
+ * frame buffer.
+ */
 void
 R_DrawScene (void)
 {
@@ -86,25 +105,12 @@ RenderPoint (float x, float y, float z)
 		int sy = camera.center_y - camera.dist * ((y - camera.altitude) / out[1]);
 		PutPixel (sx, sy, 0xffff);
 	}
-
-	// - back-face check w/ 0.01 epsilon
-	// - clip the line against the view frustum
-	// - translate both vertices to view space
-	// - find screen x for each vert: center_x - viewdist * (transvert[0] / transvert[1])
-	// - snap x's to pixel centers and save off coords
-	// - if the wall doesn't span a pixel's center, it's not visible, return
-	// - for each vert:
-	//   - get the wall's height in screen space: (viewdist * (wallheight / transvert[1]))
-	//   - find the wall's ceiling in screen space: center_y - viewdist * ((ceiling - cam.altitude) / transvert[1])
-	//   - screen space floor = screen space ceiling + screen space height
-	// - find dy/dx for ceiling & floor
-	// - adjust both x coords to snap onto pixel centers, adjusting respective screen y coords appropriately
-	// - reject if top is below, or bottom is above the screen
-	// - convert coords & deltas to fixed-point
-	//   - x1 = 
 }
 
 
+/*
+ * Draw to the frame buffer.
+ */
 void
 R_RenderScene (void)
 {
