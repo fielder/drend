@@ -56,6 +56,12 @@ Shutdown (void)
 		sdl_surf = NULL;
 	}
 
+	if (vid.bouncebuf != NULL)
+	{
+		free (vid.bouncebuf);
+		vid.bouncebuf = NULL;
+	}
+
 	if (vid.rows != NULL)
 	{
 		free (vid.rows);
@@ -89,17 +95,26 @@ Init (void)
 	}
 
 	flags = SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWPALETTE;
-	if ((sdl_surf = SDL_SetVideoMode(vid.w, vid.h, sizeof(pixel_t) * 8, flags)) == NULL)
+	if ((sdl_surf = SDL_SetVideoMode(vid.w * vid.scale, vid.h * vid.scale, sizeof(pixel_t) * 8, flags)) == NULL)
 	{
 		fprintf (stderr, "ERROR: failed setting video mode\n");
 		Quit ();
 	}
+	printf ("Set %dx%dx%d video mode\n", sdl_surf->w, sdl_surf->h, sdl_surf->format->BytesPerPixel * 8);
 
 	vid.rows = malloc (vid.h * sizeof(*vid.rows));
-	for (y = 0; y < vid.h; y++)
-		vid.rows[y] = (pixel_t *)((uintptr_t)sdl_surf->pixels + y * sdl_surf->pitch);
 
-	printf ("Set %dx%dx%d video mode\n", sdl_surf->w, sdl_surf->h, sdl_surf->format->BytesPerPixel * 8);
+	if (vid.scale == 1)
+	{
+		for (y = 0; y < vid.h; y++)
+			vid.rows[y] = (pixel_t *)((uintptr_t)sdl_surf->pixels + y * sdl_surf->pitch);
+	}
+	else
+	{
+		vid.bouncebuf = malloc (vid.w * vid.h * sizeof(pixel_t));
+		for (y = 0; y < vid.h; y++)
+			vid.rows[y] = vid.bouncebuf + y * vid.w;
+	}
 
 	/* camera setup */
 
@@ -341,24 +356,133 @@ RunInput (void)
 
 
 static void
+CopyScreenScaled (void)
+{
+	//FIXME: make work w/ various bpp depths
+
+	if (vid.scale == 2)
+	{
+		int x, y;
+		pixel_t *src;
+		uint32_t *t1, *t2, *d1, *d2, pix;
+		int dstride = sdl_surf->pitch / sizeof(*d1);
+
+		src = vid.bouncebuf;
+		d1 = sdl_surf->pixels;
+		d2 = d1 + dstride;
+		for (y = 0; y < vid.h; y++)
+		{
+			t1 = d1;
+			t2 = d2;
+			for (x = 0; x < vid.w; x++)
+			{
+				pix = *src++;
+				pix |= pix << 16;
+				*t1++ = pix;
+				*t2++ = pix;
+			}
+			d1 += dstride * 2;
+			d2 += dstride * 2;
+		}
+	}
+	else if (vid.scale == 3)
+	{
+		int x, y;
+		pixel_t *src;
+		uint16_t *t1, *t2, *t3, *d1, *d2, *d3, pix;
+		int dstride = sdl_surf->pitch / sizeof(*d1);
+
+		src = vid.bouncebuf;
+		d1 = sdl_surf->pixels;
+		d2 = d1 + dstride;
+		d3 = d2 + dstride;
+		for (y = 0; y < vid.h; y++)
+		{
+			t1 = d1;
+			t2 = d2;
+			t3 = d3;
+			for (x = 0; x < vid.w; x++)
+			{
+				pix = *src++;
+				*t1++ = pix; *t1++ = pix; *t1++ = pix;
+				*t2++ = pix; *t2++ = pix; *t2++ = pix;
+				*t3++ = pix; *t3++ = pix; *t3++ = pix;
+			}
+			d1 += dstride * 3;
+			d2 += dstride * 3;
+			d3 += dstride * 3;
+		}
+	}
+	else if (vid.scale == 4)
+	{
+#if 0
+		//FIXME: wouldn't we need 8 dest pointers?
+		int x, y;
+		pixel_t *src;
+		uint32_t *t1, *t2, *t3, *t4, *d1, *d2, *d3, *d4, pix;
+		int dstride = sdl_surf->pitch / sizeof(*d1);
+
+		src = vid.bouncebuf;
+		d1 = sdl_surf->pixels;
+		d2 = d1 + dstride;
+		d3 = d2 + dstride;
+		d4 = d3 + dstride;
+		for (y = 0; y < vid.h; y++)
+		{
+			t1 = d1;
+			t2 = d2;
+			t3 = d3;
+			t4 = d4;
+			for (x = 0; x < vid.w; x++)
+			{
+				pix = *src++;
+				pix |= pix << 16;
+				*t1++ = pix; *t1++ = pix;
+				*t2++ = pix; *t2++ = pix;
+				*t3++ = pix; *t3++ = pix;
+				*t4++ = pix; *t4++ = pix;
+			}
+			d1 += dstride * 4;
+			d2 += dstride * 4;
+			d3 += dstride * 4;
+			d4 += dstride * 4;
+		}
+#endif
+	}
+	else
+	{
+	}
+}
+
+
+static void
 Refresh (void)
 {
 	/* do as much as we can _before_ touching the frame buffer */
 	R_DrawScene ();
 
-	LockSurface ();
-
-	if (1)
+	if (vid.scale == 1)
 	{
-		int y;
-		for (y = 0; y < vid.h; y++)
-			memset (vid.rows[y], 0x00, vid.w * sizeof(*vid.rows[y]));
+		/* draw directly to the video surface */
+
+		LockSurface ();
+
+		ClearScreen (0x00);
+		R_RenderScene ();
+
+		UnLockSurface ();
 	}
+	else
+	{
+		/* draw to the bounce buffer first */
+		ClearScreen (0x00);
+		R_RenderScene ();
 
-	/* finally, draw pixels out */
-	R_RenderScene ();
-
-	UnLockSurface ();
+		/* then scale it directly to the video surface */
+		LockSurface ();
+		CopyScreenScaled ();
+		UnLockSurface ();
+	}
 
 	SDL_Flip (sdl_surf);
 
@@ -384,8 +508,9 @@ main (int argc, const char **argv)
 	Uint32 last, duration, now;
 
 	memset (&vid, 0, sizeof(vid));
-	vid.w = 320 * 1;
-	vid.h = 240 * 1;
+	vid.w = 320;
+	vid.h = 240;
+	vid.scale = 3;
 
 	Init ();
 

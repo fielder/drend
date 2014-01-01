@@ -73,7 +73,9 @@ struct input_s
 struct video_s
 {
 	int w, h;
+	pixel_t *bouncebuf;
 	pixel_t **rows;
+	int scale;
 };
 
 extern struct camera_s camera;
