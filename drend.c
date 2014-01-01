@@ -415,8 +415,6 @@ CopyScreenScaled (void)
 	}
 	else if (vid.scale == 4)
 	{
-#if 0
-		//FIXME: wouldn't we need 8 dest pointers?
 		int x, y;
 		pixel_t *src;
 		uint32_t *t1, *t2, *t3, *t4, *d1, *d2, *d3, *d4, pix;
@@ -447,7 +445,6 @@ CopyScreenScaled (void)
 			d3 += dstride * 4;
 			d4 += dstride * 4;
 		}
-#endif
 	}
 	else
 	{
