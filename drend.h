@@ -76,6 +76,7 @@ struct video_s
 	pixel_t *bouncebuf;
 	pixel_t **rows;
 	int scale;
+	pixel_t red, green, blue;
 };
 
 extern struct camera_s camera;

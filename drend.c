@@ -103,6 +103,7 @@ InitVideo (void)
 		Quit ();
 	}
 	printf ("Set %dx%dx%d video mode\n", sdl_surf->w, sdl_surf->h, sdl_surf->format->BytesPerPixel * 8);
+	printf ("RGB mask: 0x%x 0x%x 0x%x\n", sdl_surf->format->Rmask, sdl_surf->format->Gmask, sdl_surf->format->Bmask);
 
 	vid.rows = malloc (vid.h * sizeof(*vid.rows));
 
@@ -457,6 +458,10 @@ ClearScreen (int color)
 static void
 Refresh (void)
 {
+	char spanbuf[0x8000];
+
+	S_SpanBeginFrame (spanbuf, sizeof(spanbuf));
+
 	/* do as much as we can _before_ touching the frame buffer */
 	R_DrawScene ();
 

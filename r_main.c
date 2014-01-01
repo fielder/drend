@@ -21,12 +21,15 @@ R_Init (void)
 	Vec_Clear (camera.pos);
 	camera.altitude = 0.0;
 	camera.angle = 0.0;
+
+	S_SpanInit ();
 }
 
 
 void
 R_Shutdown (void)
 {
+	S_SpanCleanup ();
 }
 
 
@@ -120,5 +123,6 @@ R_RenderScene (void)
 		for (z = -50; z < 50; z++)
 			RenderPoint(x*4, 0, z*4);
 	}
-	//...
+
+	S_RenderGSpans ();
 }
