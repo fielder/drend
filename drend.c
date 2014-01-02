@@ -459,8 +459,10 @@ static void
 Refresh (void)
 {
 	char spanbuf[0x8000];
+	char wallbuf[0x8000];
 
 	S_SpanBeginFrame (spanbuf, sizeof(spanbuf));
+	R_BeginWallFrame (wallbuf, sizeof(wallbuf));
 
 	/* do as much as we can _before_ touching the frame buffer */
 	R_DrawScene ();

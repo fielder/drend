@@ -95,8 +95,10 @@ Vec_MakeNormal (const float v1[2],
 		float normal[2],
 		float *dist)
 {
-	normal[0] =  (v2[1] - v1[1]);
-	normal[1] = -(v2[0] - v1[0]);
+	/* we put the normal on the right side of the line */
+
+	normal[0] = -(v2[1] - v1[1]);
+	normal[1] =  (v2[0] - v1[0]);
 
 	Vec_Normalize (normal);
 

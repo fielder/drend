@@ -1,179 +1,140 @@
 #include <stdio.h>
-#include <stdlib.h>
+//#include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 
 #include "vec.h"
 #include "drend.h"
 #include "render.h"
 
-struct vert_s
-{
-	float xz[2];
-};
+#define BACKFACE_EPSILON 0.01
 
-
-struct plane_s
-{
-	float normal[2];
-	float dist;
-};
-
-
-struct wall_s
-{
-	struct vert_s *verts[2];
-	struct plane_s *plane;
-
-	float floorheight;
-	float ceilingheight;
-};
-
-
-struct drawspan_s
-{
-	short x;
-	short top, bottom;
-};
-
-
-struct drawwall_s
-{
-	struct wall_s *wall;
-
-	struct drawspan_s *spans;
-	int num_spans;
-};
-
-/* ================================================================== */
-
-
-/* green span */
-struct gspan_s
-{
-	struct gspan_s *prev, *next;
-	short top, bottom;
-};
-
-static struct gspan_s *r_gspans = NULL;
-static struct gspan_s *r_gspans_pool = NULL;
-
-/* these point to a buffer on the stack, as they don't need to be kept
- * around across frames */
-struct drawspan_s *r_spans = NULL;
-static struct drawspan_s *r_spans_end = NULL;
+struct drawwall_s *r_walls = NULL;
+static struct drawwall_s *r_walls_start = NULL;
+static struct drawwall_s *r_walls_end = NULL;
 
 
 void
-S_SpanCleanup (void)
+R_BeginWallFrame (void *buf, int buflen)
 {
-	if (r_gspans != NULL)
+	/* prepare the given wall buffer */
+	uintptr_t w = (uintptr_t)buf;
+
+	while ((w % sizeof(struct drawwall_s)) != 0)
 	{
-		free (r_gspans);
-		r_gspans = NULL;
-		r_gspans_pool = NULL;
-	}
-}
-
-
-void
-S_SpanInit (void)
-{
-	struct gspan_s *alloced;
-	int i, count, sz;
-
-	S_SpanCleanup ();
-
-	/* estimate a probable max number of spans per bucket */
-	count = vid.w * 24;
-
-	sz = sizeof(*alloced) * count;
-
-	alloced = malloc (sz);
-
-	/* The first handful are reserved as each column's gspan
-	 * list head. ie: one element per screen column just for
-	 * linked-list management. */
-	r_gspans = alloced;
-	for (i = 0; i < vid.w; i++)
-		r_gspans[i].prev = r_gspans[i].next = &r_gspans[i];
-
-	r_gspans_pool = alloced + i;
-	while (i < count)
-	{
-		alloced[i].next = (i == count - 1) ? NULL : &alloced[i + 1];
-		i++;
-	}
-
-	printf ("%d byte gspan buffer\n", sz);
-}
-
-
-void
-S_SpanBeginFrame (void *buf, int buflen)
-{
-	/* prepare the given span buffer */
-	uintptr_t p = (uintptr_t)buf;
-
-	while ((p % sizeof(struct drawspan_s)) != 0)
-	{
-		p++;
+		w++;
 		buflen--;
 	}
-
-	r_spans = (struct drawspan_s *)p;
-	r_spans_end = r_spans + (buflen / sizeof(struct drawspan_s));
-
-	/* now gspans */
-	struct gspan_s *gs, *head, *next;
-	int i;
-
-	for (i = 0, head = r_gspans; i < vid.w; i++, head++)
-	{
-		/* take any gspan still remaining on the column and toss
-		 * back into the pool */
-		while ((next = head->next) != head)
-		{
-			head->next = next->next;
-			next->next = r_gspans_pool;
-			r_gspans_pool = next;
-		}
-
-		/* reset the column with 1 fresh gspan */
-
-		gs = r_gspans_pool;
-		r_gspans_pool = gs->next;
-
-		gs->top = 0;
-		gs->bottom = vid.h - 1;
-		gs->prev = gs->next = head;
-		head->prev = head->next = gs;
-	}
+	r_walls_start = r_walls = (struct drawwall_s *)w;
+	r_walls_end = r_walls_start + (buflen / sizeof(struct drawwall_s));
 }
 
 
-/*
- * Draw any remaining gspan on the screen. In normal operation, the
- * screen should be filled by the rendered world so there should never
- * be any gspans visible.
- */
-void
-S_RenderGSpans (void)
-{
-	const struct gspan_s *gs;
-	int i;
+struct vert_s _v1 = { { 32, 128 } };
+struct vert_s _v2 = { { -32, 128 } };
+struct plane_s _p = { { 0, -1 }, -128 };
+struct wall_s _w = { { &_v1, &_v2 }, &_p, 0, 128 };
 
-	for (i = 0; i < vid.w; i++)
+static float *r_p1, *r_p2;
+static float *r_clip;
+
+
+static int
+ClipWall (struct viewplane_s *plane)
+{
+	float d1, d2, frac;
+
+	d1 = Vec_Dot (plane->normal, r_p1) - plane->dist;
+	d2 = Vec_Dot (plane->normal, r_p2) - plane->dist;
+
+	if (d1 >= 0.0)
 	{
-		for (gs = r_gspans[i].next; gs != &r_gspans[i]; gs = gs->next)
+		if (d2 < 0.0)
 		{
-			int y = gs->top;
-			while (y <= gs->bottom)
-			{
-				vid.rows[y][i] = 0x7e0;
-				y++;
-			}
+			/* wall runs from front -> back */
+
+			frac = d1 / (d1 - d2);
+			r_clip[0] = r_p1[0] + frac * (r_p2[0] - r_p1[0]);
+			r_clip[1] = r_p1[1] + frac * (r_p2[1] - r_p1[1]);
+
+			r_p2 = r_clip;
+			r_clip += 2;
+		}
+		else
+		{
+			/* both vertices on the front side */
 		}
 	}
+	else
+	{
+		if (d2 < 0.0)
+		{
+			/* both vertices behind a plane; the
+			 * wall is fully clipped away */
+			return 0;
+		}
+		else
+		{
+			/* wall runs from back -> front */
+
+			frac = d1 / (d1 - d2);
+			r_clip[0] = r_p1[0] + frac * (r_p2[0] - r_p1[0]);
+			r_clip[1] = r_p1[1] + frac * (r_p2[1] - r_p1[1]);
+
+			r_p1 = r_clip;
+			r_clip += 2;
+		}
+	}
+
+	return 1;
+}
+
+
+void
+R_DrawWall (struct wall_s *w)
+{
+	float clipverts[2 * 2];
+	float local[2];
+
+	float out1[2];
+	float x1_f;
+	int x1_i;
+
+	float out2[2];
+	float x2_f;
+	int x2_i;
+
+	w = &_w;
+
+	if (Vec_Dot(camera.pos, w->plane->normal) - w->plane->dist < BACKFACE_EPSILON)
+		return;
+
+	r_p1 = w->verts[0]->xz;
+	r_p2 = w->verts[1]->xz;
+	r_clip = clipverts;
+
+	if (!ClipWall(&camera.vplanes[VPLANE_LEFT]))
+		return;
+	if (!ClipWall(&camera.vplanes[VPLANE_RIGHT]))
+		return;
+
+	Vec_Subtract (r_p1, camera.pos, local);
+	Vec_Transform (camera.xform, local, out1);
+
+	Vec_Subtract (r_p2, camera.pos, local);
+	Vec_Transform (camera.xform, local, out2);
+
+	x1_f = camera.center_x - camera.dist * (out1[0] / out1[1]);
+	x1_i = floor (x1_f + 0.5);
+
+	x2_f = camera.center_x - camera.dist * (out2[0] / out2[1]);
+	x2_i = floor (x2_f + 0.5);
+
+	/* doesn't cross any pixel center */
+	if (x1_i == x2_i)
+		return;
+
+	//...
 }
 
 

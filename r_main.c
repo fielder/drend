@@ -69,6 +69,7 @@ R_DrawScene (void)
 {
 	CalcCamera ();
 
+	R_DrawWall (NULL);
 	//...
 }
 
@@ -77,7 +78,10 @@ static void
 PutPixel (int x, int y, int c)
 {
 	if (x >= 0 && x < vid.w && y >= 0 && y < vid.h)
-		vid.rows[y][x] = c & 0xffff;
+	{
+//		vid.rows[y][x] = c & 0xffff;
+		S_ClipAndEmitSpan (x, y, y);
+	}
 }
 
 
@@ -124,5 +128,6 @@ R_RenderScene (void)
 			RenderPoint(x*4, 0, z*4);
 	}
 
-	S_RenderGSpans ();
+	if (1)
+		S_RenderGSpans ();
 }
