@@ -90,6 +90,23 @@ ClipWall (struct viewplane_s *plane)
 }
 
 
+static void
+ScanWall (int x1, int top1, int bot1, int x2, int top_dy, int bot_dy)
+{
+	while (x1 <= x2)
+	{
+		S_ClipAndEmitSpan (x1, top1 >> 20, bot1 >> 20);
+
+		top1 += top_dy;
+		bot1 += bot_dy;
+		x1++;
+	}
+}
+
+
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+
 void
 R_DrawWall (struct wall_s *w)
 {
@@ -168,29 +185,16 @@ R_DrawWall (struct wall_s *w)
 	bottom1_f = bottom1_f + bottom_dy * ((x1_i + 0.5) - x1_f);
 	bottom2_f = bottom2_f + bottom_dy * ((x2_i + 0.5) - x2_f);
 
-//	top1_i = floor (top1_f + 0.5);
-//	bottom1_i = floor (bottom1_f + 0.5) - 1;
-//	top2_i = floor (top2_f + 0.5);
-//	bottom2_i = floor (bottom2_f + 0.5) - 1;
+	/* our vertical fill rule says a column's top on a pixel center
+	 * gets the pixel, so this affects the following reject tests */
 
-//	S_ClipAndEmitSpan (x1_i, top1_i, bottom1_i);
-//	S_ClipAndEmitSpan (x2_i, top2_i, bottom2_i);
+	/* quickly reject if the floor is off the top of the screen */
+	if (MAX(bottom1_f, bottom2_f) <= 0.0)
+		return;
+	/* quickly reject if the ceiling is off the bottom of the screen */
+	if (MIN(top1_f, top2_f) > vid.h)
+		return;
 
+	ScanWall (	x1_i, top1_f * 0x100000, bottom1_f * 0x100000,
+			x2_i, top_dy * 0x100000, bottom_dy * 0x100000);
 }
-
-
-// - back-face check w/ 0.01 epsilon
-// - clip the line against the view frustum
-// - translate both vertices to view space
-// - find screen x for each vert: center_x - viewdist * (transvert[0] / transvert[1])
-// - snap x's to pixel centers and save off coords
-// - if the wall doesn't span a pixel's center, it's not visible, return
-// - for each vert:
-//   - get the wall's height in screen space: (viewdist * (wallheight / transvert[1]))
-//   - find the wall's ceiling in screen space: center_y - viewdist * ((ceiling - cam.altitude) / transvert[1])
-//   - screen space floor = screen space ceiling + screen space height
-// - find dy/dx for ceiling & floor
-// - adjust both x coords to snap onto pixel centers, adjusting respective screen y coords appropriately
-// - reject if top is below, or bottom is above the screen
-// - convert coords & deltas to fixed-point
-//   - x1 = 
