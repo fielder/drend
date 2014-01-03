@@ -157,6 +157,9 @@ S_ClipAndEmitSpan (int x, int y1, int y2)
 	struct gspan_s *head = &r_gspans[X];
 	struct gspan_s *gs, *next, *new;
 
+	if (x < 0 || x >= vid.w || y1 > y2)
+		return;
+
 	gs = head->next;
 	while (1)
 	{

@@ -102,14 +102,12 @@ RenderPoint (float x, float y, float z)
 			return;
 	}
 
-//	PutPixel (vid.w / 2 - v[0], vid.h / 2 - v[1], 0xffff);
-
 	Vec_Subtract (v, camera.pos, local);
 	Vec_Transform (camera.xform, local, out);
 	if (out[1] > 0.0)
 	{
-		int sx = camera.center_x - camera.dist * (out[0] / out[1]);
-		int sy = camera.center_y - camera.dist * ((y - camera.altitude) / out[1]);
+		int sx = camera.center_x - camera.dist * (out[0] / out[1]) + 0.5;
+		int sy = camera.center_y - camera.dist * ((y - camera.altitude) / out[1]) + 0.5;
 		PutPixel (sx, sy, 0xffff);
 	}
 }
