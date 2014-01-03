@@ -192,7 +192,7 @@ R_DrawWall (struct wall_s *w)
 	if (MAX(bottom1_f, bottom2_f) <= 0.0)
 		return;
 	/* quickly reject if the ceiling is off the bottom of the screen */
-	if (MIN(top1_f, top2_f) > vid.h)
+	if (MIN(top1_f, top2_f) > vid.h - 0.5)
 		return;
 
 	ScanWall (	x1_i, top1_f * 0x100000, bottom1_f * 0x100000,
