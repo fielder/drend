@@ -9,6 +9,7 @@
 #define BACKFACE_EPSILON 0.1
 
 #define SCANFRAC 16
+#define SCANMUL (1 << SCANFRAC)
 
 struct drawwall_s *r_walls = NULL;
 static struct drawwall_s *r_walls_start = NULL;
@@ -229,8 +230,8 @@ R_DrawWall (struct wall_s *w)
 			x2_i,
 			/* pre-adjust y coords so the resulting shift to whole
 			 * numbers will properly include the pixel centers */
-			(int)(top1_f * (1 << SCANFRAC)) + (SCANFRAC / 2) - 1,
-			(int)(bottom1_f * (1 << SCANFRAC)) - (SCANFRAC / 2) - 1,
-			top_dy * (1 << SCANFRAC),
-			bottom_dy * (1 << SCANFRAC) );
+			(int)(top1_f * SCANMUL) + (SCANMUL / 2) - 1,
+			(int)(bottom1_f * SCANMUL) - (SCANMUL / 2) - 1,
+			top_dy * SCANMUL,
+			bottom_dy * SCANMUL );
 }
