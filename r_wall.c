@@ -31,9 +31,9 @@ R_BeginWallFrame (void *buf, int buflen)
 }
 
 
-struct vert_s _v1 = { { 32, 10 } };
-struct vert_s _v2 = { { -32, 10 } };
-struct plane_s _p = { { 0, -1 }, -10 };
+struct vert_s _v1 = { { 32, 130 } };
+struct vert_s _v2 = { { -32, 130 } };
+struct plane_s _p = { { 0, -1 }, -130 };
 struct wall_s _w = { { &_v1, &_v2 }, &_p, 0, 64 };
 
 static float *r_p1, *r_p2;
@@ -92,7 +92,7 @@ ClipWall (const struct viewplane_s *plane)
 
 
 static void
-ScanWall (int x1, int top1, int bot1, int x2, int top_dy, int bot_dy)
+ScanWall (int x1, int x2, int top1, int bot1, int top_dy, int bot_dy)
 {
 	while (x1 <= x2)
 	{
@@ -127,7 +127,8 @@ R_DrawWall (struct wall_s *w)
 	float sheight;
 	float top_dy, bottom_dy;
 
-	w = &_w;
+	if (1) //DEBUG
+		w = &_w;
 
 	/* no more draw walls */
 	if (r_walls == r_walls_end)
@@ -153,6 +154,8 @@ R_DrawWall (struct wall_s *w)
 
 	Vec_Subtract (r_p2, camera.pos, local);
 	Vec_Transform (camera.xform, local, out2);
+
+	//TODO: why have the right edge include the pixel center, not the left?
 
 	/* the left exactly on a pixel center will not include that
 	 * column in the wall, but the next column */
@@ -180,6 +183,8 @@ R_DrawWall (struct wall_s *w)
 
 	if (top1_f <= 0.5 && top2_f <= 0.5)
 	{
+		/* all wall columns will touch the top row of the screen,
+		 * no need for stepping */
 		top1_f = top2_f = 0.0;
 		top_dy = 0.0;
 	}
@@ -195,6 +200,8 @@ R_DrawWall (struct wall_s *w)
 
 	if (bottom1_f > vid.h - 0.5 && bottom2_f > vid.h - 0.5)
 	{
+		/* all wall columns will touch the bottom row of the screen,
+		 * no need for stepping */
 		bottom1_f = bottom2_f = vid.h;
 		bottom_dy = 0.0;
 	}
@@ -212,12 +219,18 @@ R_DrawWall (struct wall_s *w)
 	 * gets the pixel, so this affects the following reject tests */
 
 	/* quickly reject if the floor is off the top of the screen */
-	if (MAX(bottom1_f, bottom2_f) <= 0.0)
+	if (MAX(bottom1_f, bottom2_f) <= 0.5)
 		return;
 	/* quickly reject if the ceiling is off the bottom of the screen */
 	if (MIN(top1_f, top2_f) > vid.h - 0.5)
 		return;
 
-	ScanWall (	x1_i, top1_f * (1 << SCANFRAC), bottom1_f * (1 << SCANFRAC),
-			x2_i, top_dy * (1 << SCANFRAC), bottom_dy * (1 << SCANFRAC) );
+	ScanWall (	x1_i,
+			x2_i,
+			/* pre-adjust y coords so the resulting shift to whole
+			 * numbers will properly include the pixel centers */
+			(int)(top1_f * (1 << SCANFRAC)) + (SCANFRAC / 2) - 1,
+			(int)(bottom1_f * (1 << SCANFRAC)) - (SCANFRAC / 2) - 1,
+			top_dy * (1 << SCANFRAC),
+			bottom_dy * (1 << SCANFRAC) );
 }

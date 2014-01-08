@@ -124,7 +124,7 @@ R_RenderScene (void)
 		int x, z;
 		for (x = -50; x < 50; x++)
 		{
-			float scale = 1.0;
+			float scale = 4.0;
 			for (z = -50; z < 50; z++)
 				RenderPoint(x*scale, 0, z*scale);
 		}
