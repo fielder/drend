@@ -119,11 +119,15 @@ RenderPoint (float x, float y, float z)
 void
 R_RenderScene (void)
 {
-	int x, z;
-	for (x = -50; x < 50; x++)
+	if (1)
 	{
-		for (z = -50; z < 50; z++)
-			RenderPoint(x*4, 0, z*4);
+		int x, z;
+		for (x = -50; x < 50; x++)
+		{
+			float scale = 1.0;
+			for (z = -50; z < 50; z++)
+				RenderPoint(x*scale, 0, z*scale);
+		}
 	}
 
 	if (1)

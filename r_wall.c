@@ -1,5 +1,4 @@
 #include <stdio.h>
-//#include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -7,7 +6,9 @@
 #include "drend.h"
 #include "render.h"
 
-#define BACKFACE_EPSILON 0.01
+#define BACKFACE_EPSILON 0.1
+
+#define SCANFRAC 16
 
 struct drawwall_s *r_walls = NULL;
 static struct drawwall_s *r_walls_start = NULL;
@@ -30,9 +31,9 @@ R_BeginWallFrame (void *buf, int buflen)
 }
 
 
-struct vert_s _v1 = { { 32, 128 } };
-struct vert_s _v2 = { { -32, 128 } };
-struct plane_s _p = { { 0, -1 }, -128 };
+struct vert_s _v1 = { { 32, 10 } };
+struct vert_s _v2 = { { -32, 10 } };
+struct plane_s _p = { { 0, -1 }, -10 };
 struct wall_s _w = { { &_v1, &_v2 }, &_p, 0, 64 };
 
 static float *r_p1, *r_p2;
@@ -40,7 +41,7 @@ static float *r_clip;
 
 
 static int
-ClipWall (struct viewplane_s *plane)
+ClipWall (const struct viewplane_s *plane)
 {
 	float d1, d2, frac;
 
@@ -95,7 +96,7 @@ ScanWall (int x1, int top1, int bot1, int x2, int top_dy, int bot_dy)
 {
 	while (x1 <= x2)
 	{
-		S_ClipAndEmitSpan (x1, top1 >> 20, bot1 >> 20);
+		S_ClipAndEmitSpan (x1, top1 >> SCANFRAC, bot1 >> SCANFRAC);
 
 		top1 += top_dy;
 		bot1 += bot_dy;
@@ -116,12 +117,12 @@ R_DrawWall (struct wall_s *w)
 	float out1[2];
 	float top1_f, bottom1_f;
 	float x1_f;
-	int x1_i; //, top1_i, bottom1_i;
+	int x1_i;
 
 	float out2[2];
 	float top2_f, bottom2_f;
 	float x2_f;
-	int x2_i; //, top2_i, bottom2_i;
+	int x2_i;
 
 	float sheight;
 	float top_dy, bottom_dy;
@@ -167,23 +168,45 @@ R_DrawWall (struct wall_s *w)
 	if (x1_i > x2_i)
 		return;
 
+	/* project the left edge to screen space */
 	sheight = camera.dist * ((w->ceilingheight - w->floorheight) / out1[1]);
 	top1_f = camera.center_y - camera.dist * ((w->ceilingheight - camera.altitude) / out1[1]);
 	bottom1_f = top1_f + sheight;
 
+	/* project the right edge to screen space */
 	sheight = camera.dist * ((w->ceilingheight - w->floorheight) / out2[1]);
 	top2_f = camera.center_y - camera.dist * ((w->ceilingheight - camera.altitude) / out2[1]);
 	bottom2_f = top2_f + sheight;
 
-	top_dy = (top2_f - top1_f) / (x2_f - x1_f);
-	bottom_dy = (bottom2_f - bottom1_f) / (x2_f - x1_f);
+	if (top1_f <= 0.5 && top2_f <= 0.5)
+	{
+		top1_f = top2_f = 0.0;
+		top_dy = 0.0;
+	}
+	else
+	{
+		top_dy = (top2_f - top1_f) / (x2_f - x1_f);
 
-	/* shift the projected x coords to align with the center of its
-	 * pixel and adjust the top & bottom accordingly */
-	top1_f = top1_f + top_dy * ((x1_i + 0.5) - x1_f);
-	top2_f = top2_f + top_dy * ((x2_i + 0.5) - x2_f);
-	bottom1_f = bottom1_f + bottom_dy * ((x1_i + 0.5) - x1_f);
-	bottom2_f = bottom2_f + bottom_dy * ((x2_i + 0.5) - x2_f);
+		/* shift the projected x coords to align with the center
+		 * of its pixel and adjust the top & bottom accordingly */
+		top1_f = top1_f + top_dy * ((x1_i + 0.5) - x1_f);
+		top2_f = top2_f + top_dy * ((x2_i + 0.5) - x2_f);
+	}
+
+	if (bottom1_f > vid.h - 0.5 && bottom2_f > vid.h - 0.5)
+	{
+		bottom1_f = bottom2_f = vid.h;
+		bottom_dy = 0.0;
+	}
+	else
+	{
+		bottom_dy = (bottom2_f - bottom1_f) / (x2_f - x1_f);
+
+		/* shift the projected x coords to align with the center
+		 * of its pixel and adjust the top & bottom accordingly */
+		bottom1_f = bottom1_f + bottom_dy * ((x1_i + 0.5) - x1_f);
+		bottom2_f = bottom2_f + bottom_dy * ((x2_i + 0.5) - x2_f);
+	}
 
 	/* our vertical fill rule says a column's top on a pixel center
 	 * gets the pixel, so this affects the following reject tests */
@@ -195,6 +218,6 @@ R_DrawWall (struct wall_s *w)
 	if (MIN(top1_f, top2_f) > vid.h - 0.5)
 		return;
 
-	ScanWall (	x1_i, top1_f * 0x100000, bottom1_f * 0x100000,
-			x2_i, top_dy * 0x100000, bottom_dy * 0x100000);
+	ScanWall (	x1_i, top1_f * (1 << SCANFRAC), bottom1_f * (1 << SCANFRAC),
+			x2_i, top_dy * (1 << SCANFRAC), bottom_dy * (1 << SCANFRAC) );
 }
